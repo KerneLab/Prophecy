@@ -1,0 +1,5 @@
+#!/usr/bin/sh
+bin=`which $0`
+bin=`dirname ${bin}`
+bin=`cd "$bin" > /dev/null; pwd`
+$bin/hdfs dfs "$@"
