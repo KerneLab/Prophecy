@@ -23,30 +23,28 @@ public class AppProphecy
 			{
 				File config = fc.getSelectedFile();
 
-				fc.setDialogTitle("Choose Source Directory ...");
-				fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-				if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
+				File source = new File(config.getParentFile(), "source");
+				if (!source.isDirectory())
 				{
-					File source = fc.getSelectedFile();
+					throw new RuntimeException("Source directory " + Tools.getFilePath(source) + " not exist");
+				}
 
-					fc.setDialogTitle("Choose Target Directory ...");
-					fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-					if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
-					{
-						File target = fc.getSelectedFile();
+				File target = new File(config.getParentFile(), "target");
+				if (!target.isDirectory())
+				{
+					throw new RuntimeException("Target directory " + Tools.getFilePath(target) + " not exist");
+				}
 
-						JSAN params = new JSAN().addAll(args == null ? new String[0] : args) //
-								.addLast("-config", config.getAbsolutePath(), //
-										"-source", source.getAbsolutePath(), //
-										"-target", target.getAbsolutePath() //
+				JSAN params = new JSAN().addAll(args == null ? new String[0] : args) //
+						.addLast("-config", config.getAbsolutePath(), //
+								"-source", source.getAbsolutePath(), //
+								"-target", target.getAbsolutePath() //
 						);
 
-						Prophecy.main(params.toArray(new String[params.size()]));
+				Prophecy.main(params.toArray(new String[params.size()]));
 
-						JOptionPane.showMessageDialog(null, "Output to " + Tools.getFilePath(target), "Done",
-								JOptionPane.INFORMATION_MESSAGE);
-					}
-				}
+				JOptionPane.showMessageDialog(null, "Output to " + Tools.getFilePath(target), "Done",
+						JOptionPane.INFORMATION_MESSAGE);
 			}
 		}
 		catch (Exception e)

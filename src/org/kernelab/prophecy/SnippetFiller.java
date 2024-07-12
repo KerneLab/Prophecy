@@ -15,45 +15,91 @@ import org.kernelab.basis.Tools;
 public class SnippetFiller
 {
 	/**
-	 * {@code <!--#DataId(,):<tag>xxxxx</tag>-->}
+	 * {@code <!--#DataId(,):xxxxx-->}
 	 */
-	public static final String	SNIPPET_REGEX	= "(?s:<!--#(\\w+)(?:\\((.*?)\\))?:(.*?)-->)";
+	public static final String	INFO_REGEX		= "(?s:<!--#(\\w+)(?:\\((.*?)\\))?:(.*?)-->)";
 
-	public static final Pattern	SNIPPET_PATTERN	= Pattern.compile(SNIPPET_REGEX);
+	public static final Pattern	INFO_PATTERN	= Pattern.compile(INFO_REGEX);
+
+	/**
+	 * {@code <!--@c1,c2:xxxxx-->}
+	 */
+	public static final String	INST_REGEX		= "(?s:<!--@([^:]*?):(.*?)-->)";
+
+	public static final Pattern	INST_PATTERN	= Pattern.compile(INST_REGEX);
 
 	public static void main(String[] args) throws IOException
 	{
 		ConfigLoader cl = new ConfigLoader() //
 				.setConfigFile(new File("./dat/CDMO_T1/集群配置清单.xlsx")) //
 				.reset() //
-				.loadHostConfig(0, 1, 4) //
+				.loadInfoConfig(0, 1, 4) //
 				.loadMapConfig(1, 0);
 
 		SnippetFiller sf = new SnippetFiller() //
 				.readTemplate(new File("./dat/CDMO_T1/hadoop/HA/yarn-site.xml")) //
-				.fillWith(cl);
+				.fillWith(cl, null);
 
 		Tools.debug(sf.getBuffer());
 	}
 
 	private StringBuilder buffer;
 
-	protected SnippetFiller fillHostConfig(JSON config)
+	protected SnippetFiller fillInfoConfig(JSON config)
 	{
 		boolean found = false;
 
 		do
 		{
-			Matcher matcher = SNIPPET_PATTERN.matcher(this.getBuffer());
+			Matcher matcher = INFO_PATTERN.matcher(this.getBuffer());
 
 			if (found = matcher.find())
 			{
 				String dataId = matcher.group(1);
 				String split = matcher.group(2);
 				String snippet = matcher.group(3);
-
 				this.getBuffer().replace(matcher.start(), matcher.end(),
 						fillWith(snippet, split, config.valJSAN(dataId, true)));
+			}
+		}
+		while (found);
+
+		return this;
+	}
+
+	protected SnippetFiller fillInstConfig(JSON config)
+	{
+		boolean found = false;
+
+		do
+		{
+			Matcher matcher = INST_PATTERN.matcher(this.getBuffer());
+
+			if (found = matcher.find())
+			{
+				String cols = matcher.group(1);
+				String repl = "";
+				if (!cols.trim().isEmpty())
+				{
+					for (String col : cols.split(","))
+					{
+						if (!config.containsKey(col))
+						{
+							repl = null;
+							break;
+						}
+					}
+				}
+				if (repl == null)
+				{
+					repl = "";
+				}
+				else
+				{
+					String expr = matcher.group(2);
+					repl = fillWith(expr, config);
+				}
+				this.getBuffer().replace(matcher.start(), matcher.end(), repl);
 			}
 		}
 		while (found);
@@ -65,6 +111,11 @@ public class SnippetFiller
 	{
 		this.setBuffer(new StringBuilder(new TextFiller().reset(this.getBuffer()).fillWith(json).toString()));
 		return this;
+	}
+
+	protected String fillWith(CharSequence snippet, JSON data)
+	{
+		return new TextFiller().reset(snippet).fillWith(data).toString();
 	}
 
 	protected String fillWith(CharSequence snippet, String split, JSAN data)
@@ -88,7 +139,7 @@ public class SnippetFiller
 			{
 				buffer.append(split);
 			}
-			buffer.append(filler.reset(snippet).fillWith(json.attr("no", i)).toString());
+			buffer.append(filler.reset(snippet).fillWith(json.attr("no", i).attr("cnt", data.length())).toString());
 			if (split == null)
 			{
 				break;
@@ -99,9 +150,13 @@ public class SnippetFiller
 		return buffer.toString();
 	}
 
-	public SnippetFiller fillWith(ConfigLoader config)
+	public SnippetFiller fillWith(ConfigLoader config, String inst)
 	{
-		return this.fillHostConfig(config.getHostConfig()) //
+		if (inst != null)
+		{
+			this.fillInstConfig(config.getInstConfig().valJSON(inst, true));
+		}
+		return this.fillInfoConfig(config.getInfoConfig()) //
 				.fillMapConfig(config.getMapConfig());
 	}
 

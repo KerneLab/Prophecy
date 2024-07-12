@@ -50,7 +50,7 @@ public class Prophecy
 		this.config = new ConfigLoader() //
 				.setConfigFile(file) //
 				.reset() //
-				.loadHostConfig(hostConfigSheet, hostConfigHeaderRow, hostConfigFlagBegin) //
+				.loadInfoConfig(hostConfigSheet, hostConfigHeaderRow, hostConfigFlagBegin) //
 				.loadMapConfig(mapConfigSheet, mapConfigBeginRow);
 
 		this.filler = new SnippetFiller();
@@ -58,8 +58,28 @@ public class Prophecy
 		return this;
 	}
 
-	public Prophecy process(File sourceDir, File targetDir) throws IOException
+	public Prophecy process(File sourceDir, File targetBase) throws IOException
 	{
+		Tools.deleteDirectory(targetBase);
+
+		if (this.getConfig().getInstConfig().isEmpty())
+		{
+			process(sourceDir, targetBase, null);
+		}
+		else
+		{
+			for (String inst : this.getConfig().getInstConfig().keySet())
+			{
+				process(sourceDir, targetBase, inst);
+			}
+		}
+		return this;
+	}
+
+	public Prophecy process(File sourceDir, File targetBase, String inst) throws IOException
+	{
+		File targetDir = inst != null ? new File(targetBase, inst) : targetBase;
+
 		targetDir.mkdirs();
 
 		for (File sourceFile : sourceDir.listFiles())
@@ -72,7 +92,7 @@ public class Prophecy
 			{
 				System.out.print(Tools.getFilePath(sourceFile));
 				File targetFile = new File(targetDir, sourceFile.getName());
-				this.getFiller().readTemplate(sourceFile).fillWith(this.getConfig()).writeTo(targetFile);
+				this.getFiller().readTemplate(sourceFile).fillWith(this.getConfig(), inst).writeTo(targetFile);
 				System.out.print('\t');
 				System.out.println(Tools.getFilePath(targetFile));
 			}

@@ -67,11 +67,14 @@ public class ConfigLoader
 
 	public static void main(String[] args) throws IOException
 	{
-		ConfigLoader cl = new ConfigLoader().setConfigFile(new File("./dat/CDMO_T1/集群配置清单.xlsx"));
+		ConfigLoader cl = new ConfigLoader();
 
-		cl.loadHostConfig(0, 1, 4);
+		cl.setConfigFile(new File("./dat/DEMO_ENV/conf.xlsx")) //
+				.reset() //
+				.loadInfoConfig(0, 1, 4);
 
-		Tools.debug(cl.getHostConfig().toString(0));
+		Tools.debug(cl.getInfoConfig().toString(0));
+		Tools.debug(cl.getInstConfig().toString(0));
 	}
 
 	private File					configFile;
@@ -80,9 +83,11 @@ public class ConfigLoader
 
 	private FormulaEvaluator		formulaEvaluator;
 
-	private Map<Integer, String>	hostConfigHeader;
+	private Map<Integer, String>	configHeader;
 
-	private JSON					hostConfig;
+	private JSON					instConfig;
+
+	private JSON					infoConfig;
 
 	private JSON					mapConfig;
 
@@ -106,19 +111,24 @@ public class ConfigLoader
 		return configFile;
 	}
 
+	protected Map<Integer, String> getConfigHeader()
+	{
+		return configHeader;
+	}
+
 	protected FormulaEvaluator getFormulaEvaluator()
 	{
 		return formulaEvaluator;
 	}
 
-	public JSON getHostConfig()
+	public JSON getInfoConfig()
 	{
-		return hostConfig;
+		return infoConfig;
 	}
 
-	protected Map<Integer, String> getHostConfigHeader()
+	public JSON getInstConfig()
 	{
-		return hostConfigHeader;
+		return instConfig;
 	}
 
 	public JSON getMapConfig()
@@ -128,7 +138,7 @@ public class ConfigLoader
 
 	protected void loadHeader(Sheet sheet, int headRow)
 	{
-		this.setHostConfigHeader(new LinkedHashMap<Integer, String>());
+		this.setConfigHeader(new LinkedHashMap<Integer, String>());
 
 		Row head = sheet.getRow(headRow);
 		Row prev = headRow > 0 ? sheet.getRow(headRow - 1) : null;
@@ -144,7 +154,7 @@ public class ConfigLoader
 				column = this.getCellContent(prev.getCell(index));
 			}
 
-			this.getHostConfigHeader().put(index, mapHeader(column));
+			this.getConfigHeader().put(index, mapHeader(column));
 
 			index++;
 		}
@@ -162,35 +172,59 @@ public class ConfigLoader
 	 * @return
 	 * @throws IOException
 	 */
-	public ConfigLoader loadHostConfig(int sheetIndex, int headRow, int flagFrom) throws IOException
+	public ConfigLoader loadInfoConfig(int sheetIndex, int headRow, int flagFrom) throws IOException
 	{
 		Sheet sheet = this.getConfigBook().getSheetAt(sheetIndex);
 
 		loadHeader(sheet, headRow);
+
+		int instCol = -1;
+		if ("实例".equals(getCellContent(sheet.getRow(headRow).getCell(flagFrom))))
+		{
+			instCol = flagFrom;
+			flagFrom++;
+		}
 
 		int rows = sheet.getLastRowNum();
 
 		for (int r = headRow + 1; r <= rows; r++)
 		{
 			Row row = sheet.getRow(r);
+			if (row == null)
+			{
+				continue;
+			}
 
 			JSON info = this.makeInfoData(row, 0, flagFrom);
+			JSON inst = instCol >= 0 ? info.clone() : null;
 
-			for (int c = flagFrom; c < this.getHostConfigHeader().size(); c++)
+			for (int c = flagFrom; c < this.getConfigHeader().size(); c++)
 			{
-				if ("Y".equalsIgnoreCase(this.getCellContent(row.getCell(c))))
-				{
-					String header = this.getHostConfigHeader().get(c);
+				String header = this.getConfigHeader().get(c);
+				String text = this.getCellContent(row.getCell(c));
 
-					JSAN jsan = this.getHostConfig().valJSAN(header);
+				if (text != null && !text.isEmpty())
+				{
+					info.attr(header, text);
+
+					JSAN jsan = this.getInfoConfig().valJSAN(header);
 					if (jsan == null)
 					{
 						jsan = new JSAN();
-						this.getHostConfig().put(header, jsan);
+						this.getInfoConfig().put(header, jsan);
 					}
-
 					jsan.add(info);
+
+					if (inst != null)
+					{
+						inst.attr(header, text);
+					}
 				}
+			}
+
+			if (inst != null)
+			{
+				this.getInstConfig().attr(inst.attrString("inst"), inst);
 			}
 		}
 
@@ -215,6 +249,10 @@ public class ConfigLoader
 		for (int r = rows; r >= rowBegin; r--)
 		{
 			Row row = sheet.getRow(r);
+			if (row == null)
+			{
+				continue;
+			}
 			this.getMapConfig().attr(this.getCellContent(row.getCell(0)), this.getCellContent(row.getCell(1)));
 		}
 		return this;
@@ -226,7 +264,7 @@ public class ConfigLoader
 
 		for (int i = dataBeginColumn; i < dataEndColumn; i++)
 		{
-			data.attr(this.getHostConfigHeader().get(i), this.getCellContent(row.getCell(i)));
+			data.attr(this.getConfigHeader().get(i), this.getCellContent(row.getCell(i)));
 		}
 
 		return data;
@@ -250,6 +288,10 @@ public class ConfigLoader
 		{
 			return "tag";
 		}
+		else if ("实例".equals(column))
+		{
+			return "inst";
+		}
 		else
 		{
 			return column;
@@ -258,12 +300,18 @@ public class ConfigLoader
 
 	public ConfigLoader reset()
 	{
-		return this.resetHostConfig().resetMapConfig();
+		return this.resetInfoConfig().resetInstConfig().resetMapConfig();
 	}
 
-	protected ConfigLoader resetHostConfig()
+	protected ConfigLoader resetInfoConfig()
 	{
-		this.setHostConfig(new JSON());
+		this.setInfoConfig(new JSON());
+		return this;
+	}
+
+	protected ConfigLoader resetInstConfig()
+	{
+		this.setInstConfig(new JSON());
 		return this;
 	}
 
@@ -289,21 +337,27 @@ public class ConfigLoader
 		return this;
 	}
 
+	protected ConfigLoader setConfigHeader(Map<Integer, String> header)
+	{
+		this.configHeader = header;
+		return this;
+	}
+
 	protected ConfigLoader setFormulaEvaluator(FormulaEvaluator formulaEvaluator)
 	{
 		this.formulaEvaluator = formulaEvaluator;
 		return this;
 	}
 
-	protected ConfigLoader setHostConfig(JSON configData)
+	protected ConfigLoader setInfoConfig(JSON configData)
 	{
-		this.hostConfig = configData;
+		this.infoConfig = configData;
 		return this;
 	}
 
-	protected ConfigLoader setHostConfigHeader(Map<Integer, String> header)
+	protected ConfigLoader setInstConfig(JSON instConfig)
 	{
-		this.hostConfigHeader = header;
+		this.instConfig = instConfig;
 		return this;
 	}
 
