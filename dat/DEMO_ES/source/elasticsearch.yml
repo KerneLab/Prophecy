@@ -5,9 +5,8 @@ path.data: /path/to/data<!--@:?shard?-->
 path.logs: /path/to/logs<!--@:?shard?-->
 http.port: <!--@:?httport?-->
 transport.tcp.port: <!--@:?transport?-->
-node.master: true
-node.data: true
-<!--@data:node.attr.temperature: ?data?-->
+node.roles:
+<!--@master,data_content,data_hot,data_warm,data_cold(\n):  - ?_col?-->
 discovery.seed_hosts:
 <!--#master(\n):  - ?addr?:?transport?-->
 cluster.initial_master_nodes:

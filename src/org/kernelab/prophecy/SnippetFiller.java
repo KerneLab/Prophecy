@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,28 +24,13 @@ public class SnippetFiller
 	public static final Pattern	INFO_PATTERN	= Pattern.compile(INFO_REGEX);
 
 	/**
-	 * {@code <!--@c1,c2:xxxxx-->}
+	 * {@code <!--@c1,c2(,):xxxxx-->}
 	 */
-	public static final String	INST_REGEX		= "(?s:<!--@([^:]*?):(.*?)-->)";
+	public static final String	INST_REGEX		= "(?s:<!--@([^:]*?)(?:\\((.*?)\\))?:(.*?)-->)";
 
 	public static final Pattern	INST_PATTERN	= Pattern.compile(INST_REGEX);
 
-	public static void main(String[] args) throws IOException
-	{
-		ConfigLoader cl = new ConfigLoader() //
-				.setConfigFile(new File("./dat/CDMO_T1/集群配置清单.xlsx")) //
-				.reset() //
-				.loadInfoConfig(0, 1, 4) //
-				.loadMapConfig(1, 0);
-
-		SnippetFiller sf = new SnippetFiller() //
-				.readTemplate(new File("./dat/CDMO_T1/hadoop/HA/yarn-site.xml")) //
-				.fillWith(cl, null);
-
-		Tools.debug(sf.getBuffer());
-	}
-
-	private StringBuilder buffer;
+	private StringBuilder		buffer;
 
 	protected SnippetFiller fillInfoConfig(JSON config)
 	{
@@ -78,15 +65,35 @@ public class SnippetFiller
 			if (found = matcher.find())
 			{
 				String cols = matcher.group(1);
+				String split = matcher.group(2);
 				String repl = "";
 				if (!cols.trim().isEmpty())
 				{
-					for (String col : cols.split(","))
+					if (split == null)
 					{
-						if (!config.containsKey(col))
+						for (String col : cols.split(","))
+						{
+							if (!config.containsKey(col))
+							{
+								repl = null;
+								break;
+							}
+						}
+					}
+					else
+					{
+						boolean has = false;
+						for (String col : cols.split(","))
+						{
+							if (config.containsKey(col))
+							{
+								has = true;
+								break;
+							}
+						}
+						if (!has)
 						{
 							repl = null;
-							break;
 						}
 					}
 				}
@@ -96,8 +103,28 @@ public class SnippetFiller
 				}
 				else
 				{
-					String expr = matcher.group(2);
-					repl = fillWith(expr, config);
+					if (split == null)
+					{
+						String expr = matcher.group(3);
+						repl = fillWith(expr, config);
+					}
+					else
+					{
+						split = JSON.RestoreStringContent(split);
+						String expr = matcher.group(3);
+						List<String> list = new LinkedList<String>();
+						for (String col : cols.split(","))
+						{
+							if (config.containsKey(col))
+							{
+								JSON conf = config.clone();
+								conf.attr("_col", col);
+								conf.attr("_val", config.attr(col));
+								list.add(fillWith(expr, conf));
+							}
+						}
+						repl = Tools.jointStrings(split, list);
+					}
 				}
 				this.getBuffer().replace(matcher.start(), matcher.end(), repl);
 			}

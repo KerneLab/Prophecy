@@ -21,6 +21,11 @@ public class Prophecy
 		{
 			throw new IllegalArgumentException("Target directory must not be subdirectory of the source.");
 		}
+		else if (!targetDir.isDirectory() && !targetDir.mkdirs())
+		{
+			throw new IOException(
+					"Target directory " + targetDir.getAbsolutePath() + " was not directory but could not create one.");
+		}
 
 		new Prophecy().init(config, entr).process(sourceDir, targetDir);
 	}
@@ -70,23 +75,21 @@ public class Prophecy
 		{
 			for (String inst : this.getConfig().getInstConfig().keySet())
 			{
-				process(sourceDir, targetBase, inst);
+				process(sourceDir, new File(targetBase, inst), inst);
 			}
 		}
 		return this;
 	}
 
-	public Prophecy process(File sourceDir, File targetBase, String inst) throws IOException
+	public Prophecy process(File sourceDir, File targetDir, String inst) throws IOException
 	{
-		File targetDir = inst != null ? new File(targetBase, inst) : targetBase;
-
 		targetDir.mkdirs();
 
 		for (File sourceFile : sourceDir.listFiles())
 		{
 			if (sourceFile.isDirectory())
 			{
-				process(sourceFile, new File(targetDir, sourceFile.getName()));
+				process(sourceFile, new File(targetDir, sourceFile.getName()), inst);
 			}
 			else if (sourceFile.isFile())
 			{

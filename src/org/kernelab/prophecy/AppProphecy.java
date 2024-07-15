@@ -4,6 +4,7 @@ import java.io.File;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.filechooser.FileFilter;
 
 import org.kernelab.basis.Tools;
 import org.kernelab.basis.JSON.JSAN;
@@ -19,6 +20,20 @@ public class AppProphecy
 
 			fc.setDialogTitle("Open Configure File ...");
 			fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+			fc.setFileFilter(new FileFilter()
+			{
+				@Override
+				public String getDescription()
+				{
+					return null;
+				}
+
+				@Override
+				public boolean accept(File f)
+				{
+					return f.isDirectory() || f.getName().toLowerCase().endsWith(".xlsx");
+				}
+			});
 			if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
 			{
 				File config = fc.getSelectedFile();
@@ -30,10 +45,6 @@ public class AppProphecy
 				}
 
 				File target = new File(config.getParentFile(), "target");
-				if (!target.isDirectory())
-				{
-					throw new RuntimeException("Target directory " + Tools.getFilePath(target) + " not exist");
-				}
 
 				JSAN params = new JSAN().addAll(args == null ? new String[0] : args) //
 						.addLast("-config", config.getAbsolutePath(), //
