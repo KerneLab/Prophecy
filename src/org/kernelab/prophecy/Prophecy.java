@@ -21,10 +21,15 @@ public class Prophecy
 		{
 			throw new IllegalArgumentException("Target directory must not be subdirectory of the source.");
 		}
-		else if (!targetDir.isDirectory() && !targetDir.mkdirs())
+		else
 		{
-			throw new IOException(
-					"Target directory " + targetDir.getAbsolutePath() + " was not directory but could not create one.");
+			Tools.deleteDirectory(targetDir);
+
+			if (!targetDir.isDirectory() && !targetDir.mkdirs())
+			{
+				throw new IOException("Target directory " + targetDir.getAbsolutePath()
+						+ " was not directory but could not create one.");
+			}
 		}
 
 		new Prophecy().init(config, entr).process(sourceDir, targetDir);
@@ -63,44 +68,51 @@ public class Prophecy
 		return this;
 	}
 
-	public Prophecy process(File sourceDir, File targetBase) throws IOException
+	public Prophecy process(File sourceDir, File targetDir) throws IOException
 	{
-		Tools.deleteDirectory(targetBase);
-
-		if (this.getConfig().getInstConfig().isEmpty())
+		for (File sourceFile : sourceDir.listFiles())
 		{
-			process(sourceDir, targetBase, null);
-		}
-		else
-		{
-			for (String inst : this.getConfig().getInstConfig().keySet())
+			if (sourceFile.isDirectory())
 			{
-				process(sourceDir, new File(targetBase, inst), inst);
+				if ("@".equals(sourceFile.getName()))
+				{
+					for (String inst : this.getConfig().getInstConfig().keySet())
+					{
+						process(sourceFile, new File(targetDir, inst), inst);
+					}
+				}
+				else
+				{
+					File target = new File(targetDir, sourceFile.getName());
+					target.mkdirs();
+					process(sourceFile, target);
+				}
+			}
+			else if (sourceFile.isFile())
+			{
+				process(sourceFile, new File(targetDir, sourceFile.getName()), null);
 			}
 		}
 		return this;
 	}
 
-	public Prophecy process(File sourceDir, File targetDir, String inst) throws IOException
+	public Prophecy process(File source, File target, String inst) throws IOException
 	{
-		targetDir.mkdirs();
-
-		for (File sourceFile : sourceDir.listFiles())
+		if (source.isDirectory())
 		{
-			if (sourceFile.isDirectory())
+			target.mkdirs();
+			for (File file : source.listFiles())
 			{
-				process(sourceFile, new File(targetDir, sourceFile.getName()), inst);
-			}
-			else if (sourceFile.isFile())
-			{
-				System.out.print(Tools.getFilePath(sourceFile));
-				File targetFile = new File(targetDir, sourceFile.getName());
-				this.getFiller().readTemplate(sourceFile).fillWith(this.getConfig(), inst).writeTo(targetFile);
-				System.out.print('\t');
-				System.out.println(Tools.getFilePath(targetFile));
+				process(file, new File(target, file.getName()), inst);
 			}
 		}
-
+		else if (source.isFile())
+		{
+			System.out.print(Tools.getFilePath(source));
+			this.getFiller().readTemplate(source).fillWith(this.getConfig(), inst).writeTo(target);
+			System.out.print('\t');
+			System.out.println(Tools.getFilePath(target));
+		}
 		return this;
 	}
 }

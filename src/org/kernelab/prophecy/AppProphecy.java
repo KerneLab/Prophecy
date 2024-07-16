@@ -25,7 +25,7 @@ public class AppProphecy
 				@Override
 				public String getDescription()
 				{
-					return null;
+					return "*.xlsx";
 				}
 
 				@Override
